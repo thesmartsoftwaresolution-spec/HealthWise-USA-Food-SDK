@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix HealthWise USA",
+  "description": "Evidence-based health \u0026 nutrition platform for Americans featuring practical food choices, recipes, and AI-powered wellness tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

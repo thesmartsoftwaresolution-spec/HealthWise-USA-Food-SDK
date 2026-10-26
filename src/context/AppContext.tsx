@@ -1,0 +1,224 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Article, Recipe, MealPlan, GroceryList, Habit, HabitLog } from '../types/index.ts';
+import { useAuth } from './AuthContext.tsx';
+
+export interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
+
+interface AppContextType {
+  savedArticles: Article[];
+  savedRecipes: Recipe[];
+  isArticleSaved: (id: string) => boolean;
+  isRecipeSaved: (id: string) => boolean;
+  toggleSaveArticle: (article: Article) => Promise<void>;
+  toggleSaveRecipe: (recipe: Recipe) => Promise<void>;
+  activeMealPlan: MealPlan | null;
+  setActiveMealPlan: (plan: MealPlan) => void;
+  activeGroceryList: GroceryList | null;
+  setActiveGroceryList: (list: GroceryList) => void;
+  toggleGroceryItem: (category: 'produce' | 'dairy' | 'proteins' | 'pantry' | 'frozen', itemId: string) => void;
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  toggleHabit: (habitId: number, date?: string) => Promise<void>;
+  isHabitCompletedOnDate: (habitId: number, date: string) => boolean;
+  toasts: ToastMessage[];
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  removeToast: (id: string) => void;
+  measurementUnit: 'us' | 'metric';
+  toggleMeasurementUnit: () => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const [savedArticles, setSavedArticles] = useState<Article[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
+  const [activeMealPlan, setActiveMealPlan] = useState<MealPlan | null>(null);
+  const [activeGroceryList, setActiveGroceryList] = useState<GroceryList | null>(null);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [measurementUnit, setMeasurementUnit] = useState<'us' | 'metric'>('us');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const toggleMeasurementUnit = () => {
+    setMeasurementUnit((prev) => (prev === 'us' ? 'metric' : 'us'));
+  };
+
+  // Load user data on change
+  useEffect(() => {
+    const userId = user?.id || 'user-demo-1';
+
+    // Fetch saved items
+    fetch(`/api/users/me/saved?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setSavedArticles(data.articles || []);
+          setSavedRecipes(data.recipes || []);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch meal plans
+    fetch(`/api/users/me/plans?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.plans?.length > 0) {
+          setActiveMealPlan(data.plans[0]);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch grocery lists
+    fetch(`/api/users/me/grocery?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.lists?.length > 0) {
+          setActiveGroceryList(data.lists[0]);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch habits & logs
+    fetch(`/api/users/me/habits?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setHabits(data.habits || []);
+          setHabitLogs(data.logs || []);
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const isArticleSaved = (id: string) => savedArticles.some((a) => a.id === id);
+  const isRecipeSaved = (id: string) => savedRecipes.some((r) => r.id === id);
+
+  const toggleSaveArticle = async (article: Article) => {
+    const userId = user?.id || 'user-demo-1';
+    const isSaved = isArticleSaved(article.id);
+
+    if (isSaved) {
+      setSavedArticles((prev) => prev.filter((a) => a.id !== article.id));
+      await fetch(`/api/users/me/saved/article/${article.id}?userId=${userId}`, { method: 'DELETE' });
+      showToast('Article removed from bookmarks', 'info');
+    } else {
+      setSavedArticles((prev) => [article, ...prev]);
+      await fetch('/api/users/me/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, itemType: 'article', itemId: article.id })
+      });
+      showToast('Article saved to your dashboard!', 'success');
+    }
+  };
+
+  const toggleSaveRecipe = async (recipe: Recipe) => {
+    const userId = user?.id || 'user-demo-1';
+    const isSaved = isRecipeSaved(recipe.id);
+
+    if (isSaved) {
+      setSavedRecipes((prev) => prev.filter((r) => r.id !== recipe.id));
+      await fetch(`/api/users/me/saved/recipe/${recipe.id}?userId=${userId}`, { method: 'DELETE' });
+      showToast('Recipe removed from saved collection', 'info');
+    } else {
+      setSavedRecipes((prev) => [recipe, ...prev]);
+      await fetch('/api/users/me/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, itemType: 'recipe', itemId: recipe.id })
+      });
+      showToast('Recipe saved to your dashboard!', 'success');
+    }
+  };
+
+  const toggleGroceryItem = (category: 'produce' | 'dairy' | 'proteins' | 'pantry' | 'frozen', itemId: string) => {
+    if (!activeGroceryList) return;
+    const catItems = activeGroceryList.categories[category];
+    const updatedCat = catItems.map((item) =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    );
+    setActiveGroceryList({
+      ...activeGroceryList,
+      categories: {
+        ...activeGroceryList.categories,
+        [category]: updatedCat
+      }
+    });
+  };
+
+  const isHabitCompletedOnDate = (habitId: number, date: string) => {
+    return habitLogs.some((l) => l.habitId === habitId && l.loggedDate === date && l.completed);
+  };
+
+  const toggleHabit = async (habitId: number, date: string = new Date().toISOString().split('T')[0]) => {
+    const userId = user?.id || 'user-demo-1';
+    const isCompleted = isHabitCompletedOnDate(habitId, date);
+
+    if (isCompleted) {
+      setHabitLogs((prev) => prev.filter((l) => !(l.habitId === habitId && l.loggedDate === date)));
+    } else {
+      setHabitLogs((prev) => [...prev, { id: Date.now(), habitId, userId, loggedDate: date, completed: true }]);
+      showToast('Habit checked off for today! Keep up the momentum!', 'success');
+    }
+
+    try {
+      await fetch(`/api/users/me/habits/${habitId}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, date })
+      });
+    } catch {}
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        savedArticles,
+        savedRecipes,
+        isArticleSaved,
+        isRecipeSaved,
+        toggleSaveArticle,
+        toggleSaveRecipe,
+        activeMealPlan,
+        setActiveMealPlan,
+        activeGroceryList,
+        setActiveGroceryList,
+        toggleGroceryItem,
+        habits,
+        habitLogs,
+        toggleHabit,
+        isHabitCompletedOnDate,
+        toasts,
+        showToast,
+        removeToast,
+        measurementUnit,
+        toggleMeasurementUnit
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useApp must be used within an AppProvider');
+  return context;
+};
