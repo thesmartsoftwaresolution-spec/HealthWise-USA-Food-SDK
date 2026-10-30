@@ -69,6 +69,7 @@ export const Home: React.FC = () => {
               <Button
                 variant="accent"
                 size="lg"
+                className="hero-meal-plan-cta !bg-white !text-[#1C2B20] !border-white hover:!bg-[#E8F5EC] hover:!text-[#1A5C31] focus:!ring-white"
                 onClick={() => navigate('/ai-tools/meal-planner')}
                 icon={<CalendarDays className="w-5 h-5" />}
               >
