@@ -230,19 +230,19 @@ Deno.serve(async (request) => {
       const {data,error}=await db.from('contact_messages').select('*').order('created_at',{ascending:false}).limit(500);
       if(error)throw error;return reply({success:true,messages:data||[]});
     }
-    const contactStatus=path.match(/^\/api\/admin\\/contact\\/([^/]+)\\/status$/);
+    const contactStatus=path.match(/^\/api\/admin\/contact\/([^/]+)\/status$/);
     if(contactStatus&&method==='PUT'){
       if(!(await admin()))return fail('Administrator access required.',403);
       const {error}=await db.from('contact_messages').update({status:body.status}).eq('id',decodeURIComponent(contactStatus[1]));
       if(error)throw error;return reply({success:true});
     }
-    const roleChange=path.match(/^\/api\/admin\\/users\\/([^/]+)\\/role$/);
+    const roleChange=path.match(/^\/api\/admin\/users\/([^/]+)\/role$/);
     if(roleChange&&method==='PUT'){
       if(!(await admin()))return fail('Administrator access required.',403);
       const {error}=await db.rpc('admin_update_profile_role',{target_user_id:decodeURIComponent(roleChange[1]),new_role:body.role});
       if(error)throw error;return reply({success:true});
     }
-    const ratingPath=path.match(/^\/api\/recipes\\/([^/]+)\\/ratings$/);
+    const ratingPath=path.match(/^\/api\/recipes\/([^/]+)\/ratings$/);
     if(ratingPath&&method==='POST'){
       if(!user)return fail('Sign in to rate a recipe.',401);
       const {data:recRow}=await db.from('recipes').select('id').eq('slug',decodeURIComponent(ratingPath[1])).maybeSingle();
