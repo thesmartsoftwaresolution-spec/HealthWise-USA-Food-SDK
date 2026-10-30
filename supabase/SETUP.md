@@ -1,12 +1,18 @@
 # Supabase setup for HealthWise USA
 
-1. Set Cloudflare Pages build output to `dist`, build command to `npm run build`, and install command to `npm install`. The stale Bun lockfile has been removed because the Supabase dependency was added; run `npm install` in a network-enabled development environment and commit the generated `package-lock.json` before relying on reproducible production builds.
-2. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Cloudflare Pages environment variables for Production and Preview.
-3. Apply `migrations/20261030000000_initial_schema.sql` to the Supabase project after it is active. Review the SQL before production use.
-4. Seed the existing demo content from the repo using a trusted local environment: set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) in a local `.env`, then run `npm run seed:supabase`. The secret key is server-only; never use it in a `VITE_*` variable or commit it.
-5. In Supabase API settings, make sure the `public` schema is exposed to the Data API. Current Supabase projects may require explicitly enabling schema exposure; SQL grants and RLS policies are also provided in the migration.
-6. Configure Auth > URL Configuration with the deployed Cloudflare Pages URL and local development URL as allowed redirect URLs.
-7. Create the first administrator through Supabase Auth, then promote that user's profile using the SQL editor:
+## Completed in the connected project
+- Initial schema and RLS policies are applied.
+- 13 categories, 20 articles, 10 recipes, and site settings are seeded.
+- Supabase Edge Function `api` is deployed and active.
+- Browser-safe project URL and publishable key are configured as defaults in `src/lib/supabase.ts`; Cloudflare variables may override them.
+
+## Before production launch
+1. Set Cloudflare Pages build output to `dist`, build command to `npm run build`, and install command to `npm install`. The stale Bun lockfile was removed after adding the Supabase dependency. Generate and commit `package-lock.json` from a network-enabled development environment before relying on reproducible production builds.
+2. Configure Supabase Auth > URL Configuration with your deployed Cloudflare Pages URL and local development URL as allowed redirect URLs.
+3. Add `GEMINI_API_KEY` as a Supabase Edge Function secret to enable AI tools. Do not paste the key into browser code or commit it to GitHub.
+4. Register your own account through the website. Then promote that account to admin using the Supabase SQL editor:
    `update public.profiles set role = 'admin' where email = 'YOUR-ADMIN-EMAIL';`
-   Never expose an admin role switcher or put a service role/secret key in browser code.
-8. Set up AI and remaining API functionality as Supabase Edge Functions, with provider keys stored as Edge Function secrets. The old Express server uses in-memory data and will not run merely by deploying the Vite `dist` folder.
+   The profile role trigger and RLS policies prevent regular users from promoting themselves.
+5. The initial schema is in `migrations/20261030000000_initial_schema.sql`; follow-up security and policy changes are in the later migration files. They have already been applied to the connected Supabase project. Re-apply them only when setting up a new project.
+6. The content seeding script is available as `npm run seed:supabase`. It requires `SUPABASE_URL` and a server-only `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) in a trusted local environment. Never use a secret/service-role key in a `VITE_*` variable.
+7. Confirm the `public` schema is exposed to the Supabase Data API if the deployed Edge Function reports table/schema access errors. The migration includes explicit grants and RLS policies.
