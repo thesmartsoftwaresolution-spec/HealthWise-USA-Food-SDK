@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   ChevronDown,
   LogOut,
-  Sliders,
   Bookmark,
   CalendarDays,
   Menu,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
-  const { user, switchUser, logout } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -177,50 +176,6 @@ export const Header: React.FC = () => {
                         <span>Admin Control Panel</span>
                       </Link>
                     )}
-                  </div>
-
-                  {/* Quick Persona Switcher for effortless testing */}
-                  <div className="px-4 py-2 bg-[#F4F8F5]">
-                    <p className="text-[11px] font-semibold text-[#5A7060] uppercase mb-1.5 flex items-center gap-1">
-                      <Sliders className="w-3 h-3" />
-                      <span>Quick Role Switch</span>
-                    </p>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          switchUser('user');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className={`text-xs px-2 py-1 rounded-md font-medium transition ${
-                          user.role === 'user' ? 'bg-[#2D7D46] text-white' : 'bg-white border text-[#1C2B20]'
-                        }`}
-                      >
-                        Sarah (User)
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          switchUser('admin');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className={`text-xs px-2 py-1 rounded-md font-medium transition ${
-                          user.role === 'admin' ? 'bg-[#2D7D46] text-white' : 'bg-white border text-[#1C2B20]'
-                        }`}
-                      >
-                        Dr. Alex (Admin)
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          switchUser('guest');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="text-xs px-2 py-1 rounded-md font-medium bg-white border text-[#1C2B20] hover:bg-gray-100"
-                      >
-                        Guest
-                      </button>
-                    </div>
                   </div>
 
                   <div className="py-1">
