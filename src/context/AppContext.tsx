@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Article, Recipe, MealPlan, GroceryList, Habit, HabitLog } from '../types/index.ts';
 import { useAuth } from './AuthContext.tsx';
+import { supabase } from '../lib/supabase.ts';
 
 export interface ToastMessage {
   id: string;
@@ -37,8 +38,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { user } = useAuth();
   const [savedArticles, setSavedArticles] = useState<Article[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
-  const [activeMealPlan, setActiveMealPlan] = useState<MealPlan | null>(null);
-  const [activeGroceryList, setActiveGroceryList] = useState<GroceryList | null>(null);
+  const [activeMealPlan, setActiveMealPlanState] = useState<MealPlan | null>(null);
+  const [activeGroceryList, setActiveGroceryListState] = useState<GroceryList | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -60,14 +61,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMeasurementUnit((prev) => (prev === 'us' ? 'metric' : 'us'));
   };
 
+  const setActiveMealPlan = (plan: MealPlan) => {
+    setActiveMealPlanState(plan);
+    if (!user || !supabase) return;
+    void supabase.from('meal_plans').upsert({
+      id: plan.id,
+      user_id: user.id,
+      title: plan.title,
+      week_of: plan.weekOf || null,
+      dietary_prefs: plan.dietaryPrefs || [],
+      allergies: plan.allergies || [],
+      calorie_goal: plan.calorieGoal ?? null,
+      weekly_budget: plan.weeklyBudget ?? null,
+      servings: plan.servings || 1,
+      plan_data: plan.planData,
+      status: plan.status || 'active',
+    }, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('Unable to save meal plan:', error.message);
+    });
+  };
+
+  const setActiveGroceryList = (list: GroceryList) => {
+    setActiveGroceryListState(list);
+    if (!user || !supabase) return;
+    void supabase.from('grocery_lists').upsert({
+      id: list.id,
+      user_id: user.id,
+      meal_plan_id: list.mealPlanId || null,
+      title: list.title,
+      categories: list.categories,
+      estimated_total: list.estimatedTotal || 0,
+    }, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('Unable to save grocery list:', error.message);
+    });
+  };
+
   // Load user data on change
   useEffect(() => {
     const userId = user?.id;
     if (!userId) {
       setSavedArticles([]);
       setSavedRecipes([]);
-      setActiveMealPlan(null);
-      setActiveGroceryList(null);
+      setActiveMealPlanState(null);
+      setActiveGroceryListState(null);
       setHabits([]);
       setHabitLogs([]);
       return;
@@ -89,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.plans?.length > 0) {
-          setActiveMealPlan(data.plans[0]);
+          setActiveMealPlanState(data.plans[0]);
         }
       })
       .catch(() => {});
@@ -99,7 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.lists?.length > 0) {
-          setActiveGroceryList(data.lists[0]);
+          setActiveGroceryListState(data.lists[0]);
         }
       })
       .catch(() => {});
