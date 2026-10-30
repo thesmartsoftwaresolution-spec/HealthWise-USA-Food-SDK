@@ -62,7 +62,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load user data on change
   useEffect(() => {
-    const userId = user?.id || 'user-demo-1';
+    const userId = user?.id;
+    if (!userId) {
+      setSavedArticles([]);
+      setSavedRecipes([]);
+      setActiveMealPlan(null);
+      setActiveGroceryList(null);
+      setHabits([]);
+      setHabitLogs([]);
+      return;
+    }
 
     // Fetch saved items
     fetch(`/api/users/me/saved?userId=${userId}`)
@@ -111,7 +120,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isRecipeSaved = (id: string) => savedRecipes.some((r) => r.id === id);
 
   const toggleSaveArticle = async (article: Article) => {
-    const userId = user?.id || 'user-demo-1';
+    if (!user) {
+      showToast('Please sign in to save articles to your account.', 'error');
+      return;
+    }
+    const userId = user.id;
     const isSaved = isArticleSaved(article.id);
 
     if (isSaved) {
@@ -130,7 +143,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleSaveRecipe = async (recipe: Recipe) => {
-    const userId = user?.id || 'user-demo-1';
+    if (!user) {
+      showToast('Please sign in to save recipes to your account.', 'error');
+      return;
+    }
+    const userId = user.id;
     const isSaved = isRecipeSaved(recipe.id);
 
     if (isSaved) {
@@ -168,7 +185,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleHabit = async (habitId: number, date: string = new Date().toISOString().split('T')[0]) => {
-    const userId = user?.id || 'user-demo-1';
+    if (!user) {
+      showToast('Please sign in to track your habits.', 'error');
+      return;
+    }
+    const userId = user.id;
     const isCompleted = isHabitCompletedOnDate(habitId, date);
 
     if (isCompleted) {
