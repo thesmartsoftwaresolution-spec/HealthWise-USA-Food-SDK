@@ -239,7 +239,8 @@ Deno.serve(async (request) => {
     const roleChange=path.match(/^\/api\/admin\/users\/([^/]+)\/role$/);
     if(roleChange&&method==='PUT'){
       if(!(await admin()))return fail('Administrator access required.',403);
-      const {error}=await db.rpc('admin_update_profile_role',{target_user_id:decodeURIComponent(roleChange[1]),new_role:body.role});
+      if(!['user','editor','admin'].includes(String(body.role)))return fail('Invalid role.');
+      const {error}=await db.from('profiles').update({role:body.role}).eq('id',decodeURIComponent(roleChange[1]));
       if(error)throw error;return reply({success:true});
     }
     const ratingPath=path.match(/^\/api\/recipes\/([^/]+)\/ratings$/);
