@@ -24,3 +24,46 @@ h1, h2, h3, .font-serif {
     color: black !important;
   }
 }
+
+
+/* Hero meal-plan call-to-action: gentle attention animation with accessible motion support. */
+.hero-meal-plan-cta {
+  animation: meal-plan-cta-glow 2.8s ease-in-out infinite;
+  transform: translateZ(0);
+  transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.hero-meal-plan-cta svg {
+  transition: transform 220ms ease;
+}
+
+.hero-meal-plan-cta:hover {
+  animation-play-state: paused;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgb(132 212 155 / 24%);
+}
+
+.hero-meal-plan-cta:hover svg {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+.hero-meal-plan-cta:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@keyframes meal-plan-cta-glow {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgb(255 255 255 / 10%);
+  }
+  50% {
+    box-shadow: 0 6px 24px rgb(132 212 155 / 30%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-meal-plan-cta,
+  .hero-meal-plan-cta svg {
+    animation: none;
+    transition: none;
+  }
+}
