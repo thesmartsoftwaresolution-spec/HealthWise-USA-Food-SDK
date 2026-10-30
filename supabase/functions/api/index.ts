@@ -198,7 +198,92 @@ Deno.serve(async (request) => {
       if(!values.name||!values.email.includes('@')||!values.subject||!values.message)return fail('Complete all required fields.');
       const {error}=await db.from('contact_messages').insert(values);if(error)throw error;return reply({success:true,message:'Message sent.'});
     }
-    if(path.startsWith('/api/ai/'))return fail('AI endpoints need to be deployed and configured with GEMINI_API_KEY in Supabase Edge Function secrets.',503);
+    if(path==='/api/settings'&&method==='PUT'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {error}=await db.from('site_settings').upsert({id:true,daily_tip:body.dailyTip||'',settings:body});
+      if(error)throw error;return reply({success:true,settings:body});
+    }
+    if(path==='/api/admin/stats'&&method==='GET'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const [u,a,r,n,m]=await Promise.all([
+        db.from('profiles').select('id',{count:'exact',head:true}),
+        db.from('articles').select('id',{count:'exact',head:true}),
+        db.from('recipes').select('id',{count:'exact',head:true}),
+        db.from('newsletter_subscribers').select('id',{count:'exact',head:true}),
+        db.from('contact_messages').select('id',{count:'exact',head:true})
+      ]);
+      return reply({success:true,stats:{users:u.count||0,articles:a.count||0,recipes:r.count||0,subscribers:n.count||0,contactMessages:m.count||0}});
+    }
+    if(path==='/api/admin/users'&&method==='GET'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {data,error}=await db.from('profiles').select('id,email,name,role,status,created_at,last_login_at,dietary_prefs').order('created_at',{ascending:false}).limit(500);
+      if(error)throw error;
+      return reply({success:true,users:(data||[]).map((p:any)=>({id:p.id,email:p.email,name:p.name,role:p.role,status:p.status,createdAt:p.created_at,lastLoginAt:p.last_login_at,dietaryPrefs:p.dietary_prefs}))});
+    }
+    if(path==='/api/admin/newsletter'&&method==='GET'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {data,error}=await db.from('newsletter_subscribers').select('*').order('subscribed_at',{ascending:false}).limit(1000);
+      if(error)throw error;return reply({success:true,subscribers:data||[]});
+    }
+    if(path==='/api/admin/contact'&&method==='GET'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {data,error}=await db.from('contact_messages').select('*').order('created_at',{ascending:false}).limit(500);
+      if(error)throw error;return reply({success:true,messages:data||[]});
+    }
+    const contactStatus=path.match(/^\\/api\\/admin\\/contact\\/([^/]+)\\/status$/);
+    if(contactStatus&&method==='PUT'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {error}=await db.from('contact_messages').update({status:body.status}).eq('id',decodeURIComponent(contactStatus[1]));
+      if(error)throw error;return reply({success:true});
+    }
+    const roleChange=path.match(/^\\/api\\/admin\\/users\\/([^/]+)\\/role$/);
+    if(roleChange&&method==='PUT'){
+      if(!(await admin()))return fail('Administrator access required.',403);
+      const {error}=await db.rpc('admin_update_profile_role',{target_user_id:decodeURIComponent(roleChange[1]),new_role:body.role});
+      if(error)throw error;return reply({success:true});
+    }
+    const ratingPath=path.match(/^\\/api\\/recipes\\/([^/]+)\\/ratings$/);
+    if(ratingPath&&method==='POST'){
+      if(!user)return fail('Sign in to rate a recipe.',401);
+      const {data:recRow}=await db.from('recipes').select('id').eq('slug',decodeURIComponent(ratingPath[1])).maybeSingle();
+      if(!recRow)return fail('Recipe not found.',404);
+      const rating=Number(body.rating);
+      if(!Number.isInteger(rating)||rating<1||rating>5)return fail('Rating must be between 1 and 5.');
+      const {data,error}=await db.from('recipe_ratings').upsert({recipe_id:recRow.id,user_id:user.id,rating,review:String(body.review||'').slice(0,2000)},{onConflict:'recipe_id,user_id'}).select('*').single();
+      if(error)throw error;
+      return reply({success:true,newRating:{id:data.id,recipeId:data.recipe_id,userId:data.user_id,userName:user.email||'Member',rating:data.rating,review:data.review,createdAt:data.created_at}});
+    }
+    if(path.startsWith('/api/ai/')){
+      if(!user)return fail('Sign in to use AI tools.',401);
+      const apiKey=Deno.env.get('GEMINI_API_KEY');
+      if(!apiKey)return fail('AI is not configured. Add GEMINI_API_KEY to Supabase Edge Function secrets.',503);
+      const prompts:any={
+        '/api/ai/chat':String(body.message||''),
+        '/api/ai/meal-plan':'Create a practical seven-day meal plan. Return JSON with title, days (each has day, meals with breakfast/lunch/dinner/snack, totalCalories), weeklyAvgCalories, estimatedWeeklyCost. Respect preferences and allergies. Input: '+JSON.stringify(body),
+        '/api/ai/recipe':'Create a practical healthy recipe as JSON with title, description, ingredients, instructions, servings, prepTimeMin, cookTimeMin, calories, proteinG, carbsG, fatG. Respect allergies. Input: '+JSON.stringify(body),
+        '/api/ai/nutrition':'Give a cautious nutrition estimate and explain uncertainty for this food. Input: '+JSON.stringify(body),
+        '/api/ai/grocery':'Create a categorized grocery list as JSON with categories produce, dairy, proteins, pantry, frozen and estimatedTotal. Input: '+JSON.stringify(body)
+      };
+      if(!prompts[path])return fail('Unknown AI tool.',404);
+      const isChat=path==='/api/ai/chat'||path==='/api/ai/nutrition';
+      const promptText='You are HealthWise USA, an evidence-informed general wellness and nutrition assistant. Do not diagnose, prescribe, or replace a clinician. Respect stated allergies. For health questions, state uncertainty and advise professional care when appropriate. '+prompts[path];
+      const aiResponse=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(apiKey),{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{role:'user',parts:[{text:promptText}]}],generationConfig:isChat?{}:{responseMimeType:'application/json'}})
+      });
+      if(!aiResponse.ok){console.error('Gemini API status',aiResponse.status);return fail('AI provider request failed. Check GEMINI_API_KEY and provider access.',502);}
+      const aiJson=await aiResponse.json();
+      const output=(aiJson.candidates?.[0]?.content?.parts||[]).map((p:any)=>p.text||'').join('');
+      if(path==='/api/ai/chat')return reply({success:true,reply:output,relatedArticles:[],remainingRequests:10});
+      let parsed:any;try{parsed=JSON.parse(output)}catch{parsed={text:output}}
+      if(path==='/api/ai/meal-plan'){
+        const plan={id:crypto.randomUUID(),userId:user.id,title:parsed.title||'Your personalized meal plan',weekOf:new Date().toISOString().slice(0,10),dietaryPrefs:body.dietaryPrefs||[],allergies:body.allergies||[],calorieGoal:body.calorieGoal,weeklyBudget:body.weeklyBudget,servings:body.servings||1,planData:parsed,status:'active',createdAt:new Date().toISOString()};
+        const {error}=await db.from('meal_plans').insert({id:plan.id,user_id:user.id,title:plan.title,week_of:plan.weekOf,dietary_prefs:plan.dietaryPrefs,allergies:plan.allergies,calorie_goal:plan.calorieGoal,weekly_budget:plan.weeklyBudget,servings:plan.servings,plan_data:plan.planData,status:'active'});
+        if(error)throw error;return reply({success:true,plan});
+      }
+      if(path==='/api/ai/grocery')return reply({success:true,list:parsed});
+      return reply({success:true,data:parsed});
+    }
     return fail('API route not implemented.',404);
   } catch(error) {
     console.error('Supabase API request failed:',error);
