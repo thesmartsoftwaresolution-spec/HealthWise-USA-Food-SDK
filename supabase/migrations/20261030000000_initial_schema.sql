@@ -63,6 +63,10 @@ create table if not exists public.recipes (
   category_id bigint references public.categories(id) on delete set null,
   category_name text,
   dietary_tags text[] not null default '{}',
+  allergens text[] not null default '{}',
+  difficulty text not null default 'easy' check (difficulty in ('easy','medium','hard')),
+  fiber_g numeric,
+  sodium_mg numeric,
   ingredients jsonb not null default '[]'::jsonb,
   instructions jsonb not null default '[]'::jsonb,
   prep_time_min integer not null default 0,
@@ -327,3 +331,28 @@ grant update (name, dietary_prefs, measurement_unit, newsletter_opt_in, avatar_u
 grant select, insert, update, delete on public.categories, public.articles, public.recipes, public.site_settings, public.newsletter_subscribers, public.contact_messages to authenticated;
 grant select on public.ai_usage_logs to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+
+-- Administrators may view all profiles, but users can only update their own safe profile fields.
+drop policy if exists "profiles admin read" on public.profiles;
+create policy "profiles admin read" on public.profiles for select to authenticated using ((select private.is_admin()));
+
+create or replace function public.admin_update_profile_role(target_user_id uuid, new_role text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not private.is_admin() then
+    raise exception 'Administrator access required';
+  end if;
+  if new_role not in ('user','editor','admin') then
+    raise exception 'Invalid role';
+  end if;
+  update public.profiles set role = new_role where id = target_user_id;
+  if not found then raise exception 'Profile not found'; end if;
+  return true;
+end;
+$$;
+revoke all on function public.admin_update_profile_role(uuid,text) from public, anon;
+grant execute on function public.admin_update_profile_role(uuid,text) to authenticated;
