@@ -1,6 +1,6 @@
 # Supabase setup for HealthWise USA
 
-1. Set Cloudflare Pages build output to `dist` and build command to `npm run build` (or use the Bun package manager consistently).
+1. Set Cloudflare Pages build output to `dist`, build command to `npm run build`, and install command to `npm install`. The stale Bun lockfile has been removed because the Supabase dependency was added; run `npm install` in a network-enabled development environment and commit the generated `package-lock.json` before relying on reproducible production builds.
 2. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Cloudflare Pages environment variables for Production and Preview.
 3. Apply `migrations/20261030000000_initial_schema.sql` to the Supabase project after it is active. Review the SQL before production use.
 4. Seed the existing demo content from the repo using a trusted local environment: set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) in a local `.env`, then run `npm run seed:supabase`. The secret key is server-only; never use it in a `VITE_*` variable or commit it.
