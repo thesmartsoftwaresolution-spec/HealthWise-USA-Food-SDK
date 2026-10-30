@@ -29,13 +29,16 @@ export const Register: React.FC = () => {
       return;
     }
     setIsSubmitting(true);
-    const ok = await register(name, email, dietaryPrefs, newsletterOptIn);
+    const result = await register(name, email, password, dietaryPrefs, newsletterOptIn);
     setIsSubmitting(false);
-    if (ok) {
+    if (result.success && result.needsEmailConfirmation) {
+      showToast('Account created. Check your email to confirm it, then sign in.', 'success');
+      navigate('/login');
+    } else if (result.success) {
       showToast('Account created successfully! Welcome to HealthWise USA.', 'success');
       navigate('/dashboard');
     } else {
-      showToast('Could not register account. Email may already be in use.', 'error');
+      showToast('Could not create account. Check your details and password, or try another email.', 'error');
     }
   };
 
@@ -54,6 +57,7 @@ export const Register: React.FC = () => {
           <label className="text-xs font-bold uppercase tracking-wider text-[#1C2B20]">Full Name</label>
           <input
             type="text"
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -66,6 +70,7 @@ export const Register: React.FC = () => {
           <label className="text-xs font-bold uppercase tracking-wider text-[#1C2B20]">Email Address</label>
           <input
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -81,7 +86,9 @@ export const Register: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            placeholder="••••••••"
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
             className="w-full px-4 py-2.5 text-sm bg-white border border-[#D4E6D9] rounded-xl text-[#1C2B20] focus:ring-2 focus:ring-[#2D7D46]"
           />
         </div>
